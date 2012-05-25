@@ -39,6 +39,9 @@ You must the url of your tumblr blog. Note that if you have set a custom domain 
 - start: The post offset to start from. The default is 0.
 - paginationOptions: Other options to pass to jquery_pagination - See https://github.com/gbirke/jquery_pagination
 
+### Forever Scroll
+- foreverScroll: If true appends the next page when your scroll to the last post (overrides pagination). The default is false;
+
 ### Appearance
 
 - loading: A selector that specifies a element that can be shown when loading content from tumblr.
