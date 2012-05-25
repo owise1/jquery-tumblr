@@ -11,7 +11,7 @@
  * @todo Add ability to define hooks for user defined markup.
  */
 (function( $ ) {
-
+	var _fetch_next_page = false;
 	var methods = {
 		
 		/**
@@ -24,6 +24,7 @@
 		 *                        - perPage: The number of posts to return. The default is 20, and the maximum is 50.
 		 *                        - start: The post offset to start from. The default is 0.
 		 *                        - paginationOptions: Other options to pass to jquery_pagination - See https://github.com/gbirke/jquery_pagination
+		 *                        - foreverScroll: default false - If true appends the next page when your scroll to the last post (overrides pagination)
 		 *                        - photoSize: The photo size to use, accepted values are 75, 100, 250, 400, 500 and 1280. Default is 400.
 		 *                        - videoSize: The video size to embed, accepted values are 250, 500 or false. If false, the tumblr 'video-player' parameter will be used.
 		 * 	                      - timeago: If true (default) then jquery-timeago will be used for post dates.
@@ -76,12 +77,19 @@
 							settings.loading = false;
 						}
 					}
+					if( settings.foreverScroll ) {
+						settings.pagination = false;
+						$(window).scroll(function(){
+							$this.tumblr('isScrolling');
+						});
+					}
 					$(this).data('tumblr', {
 						target           : $this,
 						start            : settings.start,
 						options          : settings,
 						posts            : posts,
-						pagination_setup : false 
+						pagination_setup : false ,
+						total_posts		 : false
 					});
 				}
 				$this.tumblr('load');
@@ -102,7 +110,7 @@
 				if(data.options.loading) {
 					data.options.loading.show();
 				}
-				$this.slideUp();
+				if(!data.options.foreverScroll) $this.slideUp();
 			});
 
 			var $this = this, 
@@ -139,25 +147,30 @@
 					posts = data.posts,
 					postIterator = 0;
 
-				data.posts.empty();
-				$this.empty();
+				if(!data.options.foreverScroll){
+					data.posts.empty();
+					$this.empty();
+				}
 				if ((tumblr_api_read == undefined) || (tumblr_api_read == null)) {
 					$this.append('<div class="tumblr-error">Unable to load tumblr - its probably down...</div>');
 					return;
 				}
+				_fetch_next_page = true;
 				
 				$.each(tumblr_api_read.posts, function(i, post) {
 					$this.tumblr('addPost', post, postIterator);
 					postIterator++;
 				});
 				
-				if(data.options.timeago && $("abbr.timeago", data.posts).length > 0) {
+				data.total_posts = data.total_posts || parseInt(tumblr_api_read['posts-total']);
+				
+				if(data.options.timeago && $.fn.timeago && $("abbr.timeago", data.posts).length > 0) {
 					$("abbr.timeago", data.posts).timeago();
 				}
-				if(data.options.fancybox && $("a.lightbox", data.posts).length > 0) {
+				if(data.options.fancybox && $.fn.fancybox && $("a.lightbox", data.posts).length > 0) {
 					$("a.lightbox", data.posts).fancybox();
 				}
-				$this.html(data.posts);
+				$this[(data.options.foreverScroll ? 'append' : 'html')](data.posts);
 				if(data.options.loading) {
 					data.options.loading.hide();
 				}
@@ -347,6 +360,27 @@
 				$this.removeData('tumblr');
 			});
 		},
+		
+		isScrolling : function(){
+			var $this = $(this),
+				data = $this.data('tumblr');
+				
+				if(_fetch_next_page && data && ($lis = $('ul.tumblr-posts li', $(this))).length < data.total_posts && $this.tumblr('isScrolledIntoView', $lis.last())){
+					_fetch_next_page = false;
+					console.log(parseInt($lis.length / data.options.perPage));
+					$this.tumblr('load', parseInt($lis.length / data.options.perPage));
+				}
+		},
+		
+		isScrolledIntoView: function(elem) {
+			var docViewTop = $(window).scrollTop();
+			var docViewBottom = docViewTop + $(window).height();
+            
+			var elemTop = $(elem).offset().top;
+			var elemBottom = elemTop + $(elem).height();
+            
+			return ((elemBottom >= docViewTop) && (elemTop <= docViewBottom));
+		}
 	};
 
 	$.fn.tumblr = function( method ) {
